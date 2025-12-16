@@ -1,0 +1,67 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver_dw
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SA_PASSWORD}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./Scripts:/repo/Scripts:ro
+      - ./Datasets:/repo/Datasets:ro
+      - ./Tests:/repo/Tests:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SA_PASSWORD: "${SA_PASSWORD}"
+    volumes:
+      - ./Scripts:/repo/Scripts:ro
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "
+      set -e;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -b -i /repo/Scripts/init_database.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -d DataWarehouse -b -i /repo/Scripts/Bronze/ddl_bronze.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -d DataWarehouse -b -i /repo/Scripts/Bronze/proc_load_bronze.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -d DataWarehouse -b -i /repo/Scripts/Silver/ddl_silver.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -d DataWarehouse -b -i /repo/Scripts/Silver/proc_load_silver.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -d DataWarehouse -b -i /repo/Scripts/gold/ddl_gold.sql;
+      echo INIT_DONE;
+      "
+
+  run:
+    image: mcr.microsoft.com/mssql-tools:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    environment:
+      SA_PASSWORD: "${SA_PASSWORD}"
+    volumes:
+      - ./Scripts:/repo/Scripts:ro
+      - ./Tests:/repo/Tests:ro
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "
+      set -e;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -b -i /repo/Scripts/run_etl.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -b -i /repo/Tests/silver_quality_check.sql;
+      /opt/mssql-tools/bin/sqlcmd -C -S db -U sa -P \"$SA_PASSWORD\" -b -i /repo/Tests/gold_quality_check.sql;
+      echo RUN_DONE;
+      "
+
+volumes:
+  mssql_data:
