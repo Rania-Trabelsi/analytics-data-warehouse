@@ -12,7 +12,8 @@ Usage:
     or to redefine their structure as part of the data warehouse setup.
 ===============================================================================
 */
-
+USE Datawarehouse;
+GO
 
 
 IF OBJECT_ID('bronze.crm_cust_info', 'U') IS NOT NULL
