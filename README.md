@@ -56,7 +56,7 @@ The project is containerized using Docker for easy deployment and testing.
 
 ### Getting Started
 ```bash
-docker-compose up
+docker compose up
 ```
 
 This command will:
