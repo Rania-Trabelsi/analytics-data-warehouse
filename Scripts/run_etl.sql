@@ -30,6 +30,4 @@ GO
 -- Execute Silver Layer Load Procedure
 EXEC silver.load_silver;
 GO
--- Execute Gold Layer Load Procedure
-EXEC gold.load_gold;
-GO
+-- Note: Gold layer views are created via DDL scripts and do not require a load procedure.
