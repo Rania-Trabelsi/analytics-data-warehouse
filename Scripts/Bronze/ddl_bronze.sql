@@ -12,7 +12,7 @@ Usage:
     or to redefine their structure as part of the data warehouse setup.
 ===============================================================================
 */
-USE Datawarehouse;
+USE DataWarehouse;
 GO
 
 
